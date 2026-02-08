@@ -5,60 +5,46 @@ import com.simibubi.create.foundation.data.CreateRegistrate;
 import com.simibubi.create.foundation.item.ItemDescription;
 import com.simibubi.create.foundation.item.KineticStats;
 import com.simibubi.create.foundation.item.TooltipModifier;
-import com.simibubi.create.foundation.item.TooltipHelper.Palette;
 
 import de.mrjulsen.crn.block.AdvancedDisplayBlock;
-import de.mrjulsen.crn.event.ClientEvents;
-import de.mrjulsen.crn.event.ModEvents;
-import de.mrjulsen.crn.network.packets.cts.AdvancedDisplayUpdatePacket;
-import de.mrjulsen.crn.network.packets.cts.GlobalSettingsRequestPacket;
-import de.mrjulsen.crn.network.packets.cts.GlobalSettingsUpdatePacket;
-import de.mrjulsen.crn.network.packets.cts.NavigationRequestPacket;
-import de.mrjulsen.crn.network.packets.cts.NearestStationRequestPacket;
-import de.mrjulsen.crn.network.packets.cts.NextConnectionsRequestPacket;
-import de.mrjulsen.crn.network.packets.cts.RealtimeRequestPacket;
-import de.mrjulsen.crn.network.packets.cts.TrackStationsRequestPacket;
-import de.mrjulsen.crn.network.packets.cts.TrainDataRequestPacket;
-import de.mrjulsen.crn.network.packets.stc.GlobalSettingsResponsePacket;
-import de.mrjulsen.crn.network.packets.stc.NavigationResponsePacket;
-import de.mrjulsen.crn.network.packets.stc.NearestStationResponsePacket;
-import de.mrjulsen.crn.network.packets.stc.NextConnectionsResponsePacket;
-import de.mrjulsen.crn.network.packets.stc.RealtimeResponsePacket;
-import de.mrjulsen.crn.network.packets.stc.ServerErrorPacket;
-import de.mrjulsen.crn.network.packets.stc.TimeCorrectionPacket;
-import de.mrjulsen.crn.network.packets.stc.TrackStationResponsePacket;
-import de.mrjulsen.crn.network.packets.stc.TrainDataResponsePacket;
+import de.mrjulsen.crn.event.ModClientEvents;
+import de.mrjulsen.crn.event.ModCommonEvents;
 import de.mrjulsen.crn.registry.ModBlockEntities;
 import de.mrjulsen.crn.registry.ModBlocks;
+import de.mrjulsen.crn.registry.ModCreativeModeTab;
+import de.mrjulsen.crn.registry.ModDisplayTypes;
 import de.mrjulsen.crn.registry.ModExtras;
 import de.mrjulsen.crn.registry.ModItems;
-import de.mrjulsen.mcdragonlib.net.NetworkManagerBase;
+import de.mrjulsen.crn.registry.ModNetworkManager;
+import de.mrjulsen.crn.registry.ModSchedule;
+import de.mrjulsen.crn.registry.ModTrainStatusInfos;
 import dev.architectury.platform.Platform;
-import net.fabricmc.api.EnvType;
+import dev.architectury.utils.Env;
+import net.createmod.catnip.lang.FontHelper;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-
-import java.util.List;
-import javax.annotation.Nullable;
 
 import org.slf4j.Logger;
 
 public final class CreateRailwaysNavigator {
 
     public static final String MOD_ID = "createrailwaysnavigator";
+    public static final String SHORT_MOD_ID = "crn";
     public static final Logger LOGGER = LogUtils.getLogger();
+
+    public static final String DISCORD = "https://discord.mrjulsen.net";
+    public static final String GITHUB = "https://github.com/MisterJulsen/Create-Train-Navigator";
     
     public static final CreateRegistrate REGISTRATE = CreateRegistrate.create(MOD_ID);
 
     static {
 		REGISTRATE.setTooltipModifierFactory(item -> {
-			return new ItemDescription.Modifier(item, Palette.STANDARD_CREATE)
+			return new ItemDescription.Modifier(item, FontHelper.Palette.STANDARD_CREATE)
 				.andThen(TooltipModifier.mapNull(KineticStats.create(item)));
 		});
 	}
 
-    @Nullable
     public static KineticStats create(Item item) {
         if (item instanceof BlockItem blockItem) {
             Block block = blockItem.getBlock();
@@ -68,53 +54,32 @@ public final class CreateRailwaysNavigator {
         }
         return null;
     }
-
-	
-
-    private static NetworkManagerBase crnNet;
+    
 
     public static void load() {}
 
     public static void init() {
-           
-        ModBlocks.register();
-        ModItems.register();
-        ModBlockEntities.register();        
-        ModExtras.register();
         
-        crnNet = new NetworkManagerBase(MOD_ID, "crn_network", List.of(
-            // cts
-            GlobalSettingsRequestPacket.class,
-            GlobalSettingsUpdatePacket.class,
-            NavigationRequestPacket.class,
-            NearestStationRequestPacket.class,
-            NextConnectionsRequestPacket.class,
-            RealtimeRequestPacket.class,
-            TrackStationsRequestPacket.class,
-            TrainDataRequestPacket.class,
-            AdvancedDisplayUpdatePacket.class,
-
-            // stc
-            GlobalSettingsResponsePacket.class,
-            NavigationResponsePacket.class,
-            NearestStationResponsePacket.class,
-            NextConnectionsResponsePacket.class,
-            RealtimeResponsePacket.class,
-            ServerErrorPacket.class,
-            TrackStationResponsePacket.class,
-            TrainDataResponsePacket.class,
-            TimeCorrectionPacket.class
-        ));
+        ModBlocks.init();
+        ModItems.init();
+        ModBlockEntities.init();
+        ModExtras.init();
+        ModSchedule.init();
+        ModNetworkManager.init();
+        ModTrainStatusInfos.init();
+        ModDisplayTypes.init();
+        ModCreativeModeTab.setup();
         
         CRNPlatformSpecific.registerConfig();
 
-        ModEvents.init();
-        if (Platform.getEnv() == EnvType.CLIENT) {
-            ClientEvents.init();
+        ModCommonEvents.init();
+        if (Platform.getEnvironment() == Env.CLIENT) {
+            ModClientEvents.init();
         }
+
     }
 
-    public static NetworkManagerBase net() {
-        return crnNet;
+    public static boolean isDebug() {
+        return Platform.isDevelopmentEnvironment();
     }
 }

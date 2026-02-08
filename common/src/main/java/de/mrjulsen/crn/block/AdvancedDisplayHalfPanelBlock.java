@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import de.mrjulsen.crn.data.EBlockAlignment;
-import de.mrjulsen.mcdragonlib.data.Pair;
-import de.mrjulsen.mcdragonlib.data.Tripple;
+import de.mrjulsen.crn.block.properties.EBlockAlignment;
+import de.mrjulsen.mcdragonlib.util.Pair;
+import de.mrjulsen.mcdragonlib.util.Tripple;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
@@ -82,7 +82,7 @@ public class AdvancedDisplayHalfPanelBlock extends AbstractAdvancedSidedDisplayB
 
     public AdvancedDisplayHalfPanelBlock(Properties properties) {
         super(properties);
-    registerDefaultState(defaultBlockState()
+        registerDefaultState(defaultBlockState()
             .setValue(Y_ALIGN, EBlockAlignment.CENTER)
             .setValue(Z_ALIGN, EBlockAlignment.CENTER)
         );
@@ -143,7 +143,7 @@ public class AdvancedDisplayHalfPanelBlock extends AbstractAdvancedSidedDisplayB
     }
 
     @Override
-    public boolean canConnectWithBlock(BlockGetter level, BlockState selfState, BlockState otherState) {
+    public boolean canConnectWithBlock(IBlockGetter level, BlockState selfState, BlockState otherState) {
 		return super.canConnectWithBlock(level, selfState, otherState) &&
             selfState.getValue(Y_ALIGN) == otherState.getValue(Y_ALIGN) && 
             selfState.getValue(Z_ALIGN) == otherState.getValue(Z_ALIGN)

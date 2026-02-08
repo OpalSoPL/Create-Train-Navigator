@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import de.mrjulsen.crn.data.EBlockAlignment;
-import de.mrjulsen.mcdragonlib.data.Pair;
-import de.mrjulsen.mcdragonlib.data.Tripple;
+import de.mrjulsen.crn.block.properties.EBlockAlignment;
+import de.mrjulsen.mcdragonlib.util.Pair;
+import de.mrjulsen.mcdragonlib.util.Tripple;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
@@ -79,10 +79,12 @@ public class AdvancedDisplayPanelBlock extends AbstractAdvancedSidedDisplayBlock
             xzPos = context.getClickLocation().z - context.getClickedPos().getZ();
         }
 
-        EBlockAlignment zAlign = EBlockAlignment.POSITIVE;
+        EBlockAlignment zAlign = EBlockAlignment.CENTER;
 
-        if (direction == context.getPlayer().getDirection() || (axisDirection == AxisDirection.POSITIVE ? xzPos < 0.5D : xzPos > 0.5D)) {
-			zAlign = EBlockAlignment.NEGATIVE;
+        if (direction == context.getPlayer().getDirection().getOpposite() || (axisDirection == AxisDirection.POSITIVE ? xzPos > 0.66666666D : xzPos < 0.33333333D)) {
+            zAlign = EBlockAlignment.POSITIVE;
+        } else if (direction == context.getPlayer().getDirection() || (axisDirection == AxisDirection.POSITIVE ? xzPos < 0.33333333D : xzPos > 0.66666666D)) {
+            zAlign = EBlockAlignment.NEGATIVE;
         }
 
 		return stateForPlacement
@@ -103,7 +105,7 @@ public class AdvancedDisplayPanelBlock extends AbstractAdvancedSidedDisplayBlock
     }
     
     @Override
-    public boolean canConnectWithBlock(BlockGetter level, BlockState selfState, BlockState otherState) {
+    public boolean canConnectWithBlock(IBlockGetter level, BlockState selfState, BlockState otherState) {
 		return super.canConnectWithBlock(level, selfState, otherState) &&
             selfState.getValue(Z_ALIGN) == otherState.getValue(Z_ALIGN)
 		;

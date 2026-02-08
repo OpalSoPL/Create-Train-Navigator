@@ -3,13 +3,15 @@ package de.mrjulsen.crn.block;
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import com.simibubi.create.foundation.block.IBE;
 
-import de.mrjulsen.crn.block.be.TrainStationClockBlockEntity;
+import de.mrjulsen.crn.CreateRailwaysNavigator;
+import de.mrjulsen.crn.block.blockentity.TrainStationClockBlockEntity;
 import de.mrjulsen.crn.config.ModClientConfig;
 import de.mrjulsen.crn.registry.ModBlockEntities;
-import de.mrjulsen.mcdragonlib.DragonLib;
-import de.mrjulsen.mcdragonlib.client.ber.IBlockEntityRendererInstance.EUpdateReason;
+import de.mrjulsen.mcdragonlib.util.DLColor;
 import de.mrjulsen.mcdragonlib.util.TextUtils;
-import de.mrjulsen.mcdragonlib.util.TimeUtils;
+import de.mrjulsen.mcdragonlib.util.time.ConfiguredTimeSystem;
+import de.mrjulsen.mcdragonlib.util.time.DLTime;
+import de.mrjulsen.mcdragonlib.util.time.TimeContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
@@ -29,26 +31,34 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition.Builder;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jetbrains.annotations.Nullable;
 
 public class TrainStationClockBlock extends Block implements IWrenchable, IBE<TrainStationClockBlockEntity> {
 
 	public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
+    public static final BooleanProperty DOUBLE = BooleanProperty.create("double");
 	
     private static final VoxelShape SHAPE_SN = Block.box(0, 0, 4, 16, 16, 12);
     private static final VoxelShape SHAPE_EW = Block.box(4, 0, 0, 12, 16, 16);
 
     public TrainStationClockBlock(Properties properties) {
-        super(properties);
+        super(properties
+            .noOcclusion()
+        );
 
         this.registerDefaultState(this.stateDefinition.any()
             .setValue(FACING, Direction.NORTH)
+            .setValue(DOUBLE, false)
         );
     }
 
@@ -62,10 +72,10 @@ public class TrainStationClockBlock extends Block implements IWrenchable, IBE<Tr
 			DyeColor dye = dyeItem.getDyeColor();        
 			if (dye != null) {
 				pLevel.playSound(null, pPos, SoundEvents.DYE_USE, SoundSource.BLOCKS, 1.0F, 1.0F);
-				blockEntity.setColor(dye == DyeColor.ORANGE ? 0xFF9900 : dye.getMaterialColor().col);
+				blockEntity.setColor(DLColor.fromInt(dye == DyeColor.ORANGE ? 0xFFFF9900 : dye.getMapColor().col));
 
 				if (pLevel.isClientSide) {
-					blockEntity.getRenderer().update(pLevel, pPos, pState, blockEntity, EUpdateReason.BLOCK_CHANGED);
+					blockEntity.getRenderer().update(pLevel, pPos, pState, blockEntity, null);
 				}
 
 				return InteractionResult.SUCCESS;
@@ -77,20 +87,24 @@ public class TrainStationClockBlock extends Block implements IWrenchable, IBE<Tr
 			blockEntity.setGlowing(true);
 			
 			if (pLevel.isClientSide) {
-				blockEntity.getRenderer().update(pLevel, pPos, pState, blockEntity, EUpdateReason.BLOCK_CHANGED);
+				blockEntity.getRenderer().update(pLevel, pPos, pState, blockEntity, null);
 			}
 
             return InteractionResult.SUCCESS;
 		}
 
-		if (pLevel.isClientSide) {
-            pPlayer.displayClientMessage(TextUtils.translate("gui.createrailwaysnavigator.time", TimeUtils.parseTime((int)(pLevel.getDayTime() % DragonLib.TICKS_PER_DAY + DragonLib.DAYTIME_SHIFT), ModClientConfig.TIME_FORMAT.get())), true);
+		if (!pPlayer.getItemInHand(pHand).is(this.asItem()) && pLevel.isClientSide) {
+            pPlayer.displayClientMessage(TextUtils.translate("gui." + CreateRailwaysNavigator.MOD_ID + ".time", DLTime.fromLevelTime(pLevel, new ConfiguredTimeSystem()).format(ModClientConfig.TIME_FORMAT.get().getFormat(), TimeContext.INGAME)), true);
+            return InteractionResult.SUCCESS;
         }
-        return InteractionResult.SUCCESS;
+        return InteractionResult.PASS;
     }
 
 	@Override
     public VoxelShape getShape(BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
+        if (pState.getValue(DOUBLE)) {
+            return Shapes.block();
+        }
         return pState.getValue(FACING) == Direction.NORTH || pState.getValue(FACING) == Direction.SOUTH ? SHAPE_SN : SHAPE_EW;
     }
 
@@ -107,12 +121,23 @@ public class TrainStationClockBlock extends Block implements IWrenchable, IBE<Tr
     @Override
     protected void createBlockStateDefinition(Builder<Block, BlockState> pBuilder) {
         super.createBlockStateDefinition(pBuilder);
-        pBuilder.add(FACING);
+        pBuilder.add(FACING, DOUBLE);
     }
 
     @Override
 	public BlockState getStateForPlacement(BlockPlaceContext context) {
+        BlockState blockState = context.getLevel().getBlockState(context.getClickedPos());
+		if (blockState.is(this)) {
+			return blockState.setValue(DOUBLE, true);
+		}
 		return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+	}
+
+    public boolean canBeReplaced(BlockState state, BlockPlaceContext useContext) {
+		if (useContext.getItemInHand().is(this.asItem()) && !state.getValue(DOUBLE)) {
+            return true;
+		} 
+        return false;
 	}
 
     @Override
@@ -123,6 +148,11 @@ public class TrainStationClockBlock extends Block implements IWrenchable, IBE<Tr
     @Override
     public Class<TrainStationClockBlockEntity> getBlockEntityClass() {
         return TrainStationClockBlockEntity.class;
+    }
+
+    @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new TrainStationClockBlockEntity(getBlockEntityType(), pos, state);
     }
 
     @Override

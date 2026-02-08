@@ -12,22 +12,29 @@ import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.MountedStorageManager;
 import com.simibubi.create.content.trains.entity.CarriageContraption;
 
-import de.mrjulsen.crn.block.be.IContraptionBlockEntity;
+import de.mrjulsen.crn.CRNPlatformSpecific;
+import de.mrjulsen.crn.block.blockentity.IContraptionBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
 
 @Mixin(MountedStorageManager.class)
 public class MountedStorageManagerMixin {
 
-    @Inject(method = "entityTick", remap = false, at = @At(value = "HEAD"))
-    public void tick$inject(AbstractContraptionEntity entity, CallbackInfo ci) {
+    @Inject(method = "tick", remap = false, at = @At(value = "HEAD"))
+    public void onEntityTick(AbstractContraptionEntity entity, CallbackInfo ci) {
         if (entity.getContraption() instanceof CarriageContraption carriage) {
             Set<BlockEntity> beList = new LinkedHashSet<>();
-            beList.addAll(entity.getContraption().maybeInstancedBlockEntities);
-            beList.addAll(entity.getContraption().specialRenderedBlockEntities);
+
+            for (StructureBlockInfo info : entity.getContraption().getBlocks().values()) {
+                BlockEntity be = CRNPlatformSpecific.getClientContraptionBlockEntity(entity.getContraption(), info.pos());
+                if (be != null) {
+                    beList.add(be);
+                }
+            }
 
             for (BlockEntity be : beList) {            
                 if (be instanceof IContraptionBlockEntity tile) {
-                    tile.contraptionTick(entity.level, be.getBlockPos(), be.getBlockState(), carriage);
+                    tile.contraptionTick(entity.level(), be.getBlockPos(), be.getBlockState(), carriage);
                 }
             }
 

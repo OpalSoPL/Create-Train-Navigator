@@ -1,64 +1,113 @@
 package de.mrjulsen.crn.client.ber.variants;
 
-import de.mrjulsen.crn.block.be.AdvancedDisplayBlockEntity;
+import de.mrjulsen.crn.CreateRailwaysNavigator;
+import de.mrjulsen.crn.block.blockentity.AdvancedDisplayBlockEntity;
+import de.mrjulsen.crn.block.blockentity.AdvancedDisplayBlockEntity.EUpdateReason;
+import de.mrjulsen.crn.block.display.properties.TrainDestinationCompactSettings;
 import de.mrjulsen.crn.client.ber.AdvancedDisplayRenderInstance;
-import de.mrjulsen.crn.client.ber.base.BERText;
-import de.mrjulsen.crn.client.ber.base.BERText.TextTransformation;
-import de.mrjulsen.mcdragonlib.client.ber.IBlockEntityRendererInstance.EUpdateReason;
+import de.mrjulsen.crn.client.lang.CustomLanguage;
+import de.mrjulsen.crn.data.train.ETrainStopState;
+import de.mrjulsen.mcdragonlib.client.ber.BERGraphics;
+import de.mrjulsen.mcdragonlib.client.ber.BERLabel;
+import de.mrjulsen.mcdragonlib.client.ber.BERLabel.EScrollMode;
+import de.mrjulsen.mcdragonlib.data.ETextAlignment;
+import de.mrjulsen.mcdragonlib.util.DLColor;
+import de.mrjulsen.mcdragonlib.util.DLUtils;
+import de.mrjulsen.mcdragonlib.util.Pair;
 import de.mrjulsen.mcdragonlib.util.TextUtils;
+import de.mrjulsen.mcdragonlib.util.math.Point;
+import de.mrjulsen.mcdragonlib.util.math.Rectangle;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
-public class BERTrainDestinationSimple implements IBERRenderSubtype<AdvancedDisplayBlockEntity, AdvancedDisplayRenderInstance, Boolean> {
+public class BERTrainDestinationSimple implements AbstractAdvancedDisplayRenderer<TrainDestinationCompactSettings> {
+
+    private final Component TEXT_OUT_OF_SERVICE = CustomLanguage.translate("block." + CreateRailwaysNavigator.MOD_ID + ".advanced_display.ber.not_in_service");
+    private final Component TEXT_DO_NOT_BOARD = CustomLanguage.translate("block." + CreateRailwaysNavigator.MOD_ID + ".advanced_display.ber.do_not_board");
+    
+    private final BERLabel outOfServiceLabel = new BERLabel();
+    private final BERLabel trainLineLabel = new BERLabel();
+    private final BERLabel destinationLabel = new BERLabel();
+    
+    public BERTrainDestinationSimple() {
+        outOfServiceLabel.text.set(TEXT_OUT_OF_SERVICE);
+        outOfServiceLabel.position.set(Point.of(3, 6));
+        outOfServiceLabel.horizontalScale.set(Pair.of(0.25f, 0.5f));
+        outOfServiceLabel.verticalScale.set(Pair.of(0.5f, 0.5f));
+        outOfServiceLabel.horizontalAlign.set(ETextAlignment.CENTER);
+        outOfServiceLabel.horizontalScrollingSpeed.set(SCROLLING_SPEED);
+        outOfServiceLabel.horizontalScrollMode.set(EScrollMode.WHEN_NEEDED);
+        
+        trainLineLabel.horizontalScale.set(Pair.of(0.3f, 0.6f));
+        trainLineLabel.verticalScale.set(Pair.of(0.8f, 0.8f));
+        
+        destinationLabel.horizontalScale.set(Pair.of(0.25f, 0.5f));
+        destinationLabel.verticalScale.set(Pair.of(0.5f, 0.5f));
+        destinationLabel.horizontalAlign.set(ETextAlignment.CENTER);
+        destinationLabel.horizontalScrollingSpeed.set(SCROLLING_SPEED);
+    }
 
     @Override
-    public boolean isSingleLined() {
-        return true;
+    public void render(BERGraphics<AdvancedDisplayBlockEntity> graphics, float partialTick, AdvancedDisplayRenderInstance parent, int light, boolean backSide) {
+        if (graphics.blockEntity().getTrainData() == null || graphics.blockEntity().getTrainData().getState().isIrregular(getDisplaySettings(graphics.blockEntity()).showDoNotBoardText())) {
+            outOfServiceLabel.render(graphics, light);
+            return;
+        }
+        DLUtils.doIfNotNull(trainLineLabel, x -> x.render(graphics, light));
+        DLUtils.doIfNotNull(destinationLabel, x -> x.render(graphics, light));
     }
 
     @Override
     public void update(Level level, BlockPos pos, BlockState state, AdvancedDisplayBlockEntity blockEntity, AdvancedDisplayRenderInstance parent, EUpdateReason reason) {
-        if (blockEntity.getTrainData() == null) {
+        if (blockEntity.getTrainData() == null || blockEntity.getTrainData().getState().isIrregular(getDisplaySettings(blockEntity).showDoNotBoardText())) {
+            outOfServiceLabel.clippingArea.set(Rectangle.withSize(3, 3, blockEntity.getXSizeScaled() * 16 - 6, blockEntity.getYSizeScaled() * 16 - 6));
+            outOfServiceLabel.preferredWidth.set((float)outOfServiceLabel.clippingArea.get().width());
+            outOfServiceLabel.color.set(getDisplaySettings(blockEntity).getFontColor());
+            outOfServiceLabel.text.set((blockEntity.getTrainData() != null && blockEntity.getTrainData().getState().shouldNotBoard(getDisplaySettings(blockEntity).showDoNotBoardText())) ? TEXT_DO_NOT_BOARD : TEXT_OUT_OF_SERVICE);
             return;
         }
-
-        parent.labels.clear();
         
-        int displayWidth = blockEntity.getXSizeScaled();
-        boolean isSingleBlock = blockEntity.getXSizeScaled() <= 1;
+        trainLineLabel.clippingArea.set(Rectangle.withSize(2, 2, blockEntity.getXSizeScaled() * 16 - 6, blockEntity.getYSizeScaled() * 16 - 4));
+        destinationLabel.clippingArea.set(Rectangle.withSize(2, 2, blockEntity.getXSizeScaled() * 16 - 6, blockEntity.getYSizeScaled() * 16 - 4));
+        updateContent(blockEntity);        
+    }
 
-        // TRAIN NAME
-        float maxWidth = isSingleBlock ? 11.0f : 12.0f;
-        MutableComponent line = TextUtils.text(blockEntity.getTrainData().trainName()).withStyle(ChatFormatting.BOLD);
-        BERText lastLabel = new BERText(parent.getFontUtils(), line, 0)
-            .withIsCentered(isSingleBlock)
-            .withMaxWidth(maxWidth, isSingleBlock)
-            .withStretchScale(0.3f, 0.6f)
-            .withStencil(0, displayWidth * 16 - 5)
-            .withCanScroll(isSingleBlock, 0.5f)
-            .withColor((0xFF << 24) | (blockEntity.getColor() & 0x00FFFFFF))
-            .withPredefinedTextTransformation(new TextTransformation(isSingleBlock ? 2.5f : 3.0f, 5f, 0.0f, 1, 0.8f))
-            .build();
-        parent.labels.add(lastLabel);
+    private void updateContent(AdvancedDisplayBlockEntity blockEntity) {
+        TrainDestinationCompactSettings settings = getDisplaySettings(blockEntity);
+        ETrainStopState stopState = ETrainStopState.beforeArrival(!blockEntity.getTrainData().isWaitingAtStation());
+        
+        int width = settings.getTrainNameWidth();
 
-        if (!isSingleBlock && blockEntity.getTrainData().getNextStop().isPresent()) {
-            // DESTINATION
-            float startX = lastLabel.getScaledTextWidth();
-            line = TextUtils.text(blockEntity.getTrainData().getNextStop().get().scheduleTitle());
-            maxWidth = displayWidth * 16 - 7 - startX;        
-            parent.labels.add(new BERText(parent.getFontUtils(), line, 0)
-                .withIsCentered(true)
-                .withMaxWidth(maxWidth, true)
-                .withStretchScale(0.25f, 0.5f)
-                .withStencil(0, maxWidth)
-                .withCanScroll(true, 1)
-                .withColor((0xFF << 24) | (blockEntity.getColor()))
-                .withPredefinedTextTransformation(new TextTransformation(2 + startX + 2, 6, 0.0f, 1, 0.5f))
-                .build()
-            );
+        trainLineLabel.position.set(Point.of(3, 5));
+        trainLineLabel.text.set(width == 0 ? TextUtils.empty() : TextUtils.text(blockEntity.getTrainData().getTrainData().getName(stopState)).withStyle(ChatFormatting.BOLD));
+        trainLineLabel.preferredWidth.set((float)(settings.isFullTrainNameWidth() ?
+            trainLineLabel.clippingArea.get().width() :
+            (settings.isAutoTrainNameWidth() ?
+                12 :
+                Math.min(
+                    getDisplaySettings(blockEntity).getTrainNameWidth(),
+                    trainLineLabel.clippingArea.get().width())                
+            )
+        ));
+        trainLineLabel.horizontalScrollMode.set(settings.isAutoTrainNameWidth() ? EScrollMode.FLEX_FIT : EScrollMode.WHEN_NEEDED);
+        trainLineLabel.horizontalAlign.set(settings.isFullTrainNameWidth() ? ETextAlignment.CENTER : ETextAlignment.LEFT);
+
+        if (settings.showLineColor() && blockEntity.getTrainData().getTrainData().hasColor(stopState)) {
+            trainLineLabel.backgroundColor.set(blockEntity.getTrainData().getTrainData().getColor(stopState));
+            trainLineLabel.color.set(DLColor.pickBasedOnBrightness(blockEntity.getTrainData().getTrainData().getColor(stopState), LIGHT_FONT_COLOR, DARK_FONT_COLOR, 0.5f));
+        } else {
+            trainLineLabel.backgroundColor.set(DLColor.TRANSPARENT);
+            trainLineLabel.color.set(settings.getFontColor());
         }
-    }    
+
+        
+        destinationLabel.position.set(Point.of((settings.isAutoTrainNameWidth() ? trainLineLabel.getRenderedWidth() : width) + 5, 6));
+        destinationLabel.preferredWidth.set(blockEntity.getXSizeScaled() * 16 - destinationLabel.x.get() - 3);
+        destinationLabel.text.set(settings.isFullTrainNameWidth() ? TextUtils.empty() : TextUtils.text(blockEntity.getTrainData().getCurrentStop().isPresent() ? blockEntity.getTrainData().getCurrentStop().get().getDestination() : ""));
+        destinationLabel.color.set(getDisplaySettings(blockEntity).getFontColor());        
+        destinationLabel.horizontalScrollMode.set(EScrollMode.WHEN_NEEDED);
+    }
 }
